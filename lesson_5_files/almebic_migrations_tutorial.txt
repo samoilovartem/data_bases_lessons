@@ -1,0 +1,82 @@
+>>> alembic init migrations - command to initialize alembic migrations
+
+Find 'sqlalchemy.url' in 'alembic.ini' and use your info to fill it out (use 'config.py' in our case)
+After that alembic can connect to our DB
+
+In 'migrations/env.py' do this:
+
+    import os, sys
+    sys.path.insert(0, os.path.relpath(os.path.join(os.path.dirname(__file__), '..')))
+    from models import Base
+
+    target_metadata = Base.metadata
+
+After that we can make our first migration.
+Let`s add 'year_founded' column in Company class and create migration after that:
+
+>>> alembic revision --autogenerate -m 'Added year_founded to Company' - command to create migration
+
+IMPORTANT: we just created a migration file but we didn`t make any changes in DB yet. We can upgrade (approve) and downgrade (cancel) this migration.
+
+Let`s approve it:
+
+>>> alembic upgrade head - command to approve migration
+
+Now we can see changes in our DB
+_____
+
+What if we want to change our 'year_founded' column? Now it`s a string but better to use Integer for it right? So let`s change it.
+
+1. Change it in models first
+2. alembic revision --autogenerate -m 'Changed Company.year_found type to Integer'
+
+Now if we check that migration file we will see that alembic can`t upgrade or downgrade this change.
+It`s because we didn`t give it permission for that.
+
+To do so in 'migrations/env.py' do this:
+    Add to 'context.configure' (2 places) - compare_type=True
+
+Now delete that migration and repeat:
+
+>>> alembic revision --autogenerate -m 'Changed Company.year_found type to Integer'
+
+After that we open created migration file we will see that alembic can upgrade or downgrade but if we try to use:
+
+>>> alembic upgrade head
+
+We will get an error.
+This happens because postgresql can`t automatically change data type, but we can help it by adding:
+    postgresql_using='year_founded::integer' to this migration file (upgrade function)
+
+>>> alembic upgrade head
+It works!
+
+Note that it will happen every time we want to change string type to int type, but it will not happen if
+we convert int type to string type.
+
+____
+
+Now let`s try to add currency = Column(String, nullable=False) to Payment class
+After that let`s create a migration and try to approve it.
+
+We will get an error because nullable=False but we didn`t set any value for thta column so DB will try to fill out this column with Null (None) value, but it`s impossible.
+
+To change it we need to add this code to our migration file (upgrade function):
+
+    We change nullable to True:
+    op.add_column('payments', sa.Column('currency', sa.String(), nullable=True))
+
+    And add this SQL code:
+    op.execute("UPDATE payments SET currency='PHP'")
+
+    Next:
+    op.alter_column('payments', 'currency', nullable=False)
+
+After that we can approve migration, and it will work.
+
+IF we want to downgrade the migration we just use:
+>>> alembic downgrade f735d04132cd (down_revision number)
+
+
+
+
